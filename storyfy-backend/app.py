@@ -1,8 +1,10 @@
 from flask import Flask, jsonify, request
 from config import Config
-from extensions import db, CORS
+from extensions import db, cors
 from models import User, Story
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from werkzeug.security import generate_password_hash, check_password_hash
+
 
 
 app = Flask(__name__)
@@ -10,7 +12,7 @@ app.config.from_object(Config)
 
 
 db.init_app(app)
-CORS(app)
+cors.init_app(app, resources={r"/api/*": {"origins": "*"}})
 app.config["JWT_SECRET_KEY"] = "secret_key_storyfy" 
 jwt = JWTManager(app)
 
@@ -33,7 +35,12 @@ def register():
     if existing_user:
         return jsonify({"error": "Usuario ya existe"}), 409
 
-    user = User(username=username, password=password)
+    hashed_password = generate_password_hash(password)
+
+    user = User(
+        username=username,
+        password_hash=hashed_password
+        )
     db.session.add(user)
     db.session.commit()
 
@@ -49,11 +56,14 @@ def login():
     if not username or not password:
         return jsonify({"error": "Faltan datos"}), 400
 
-    user = User.query.filter_by(username=username, password=password).first()
+    user = User.query.filter_by(username=username).first()
 
-    if user:
+    if user and check_password_hash(user.password_hash, password):
         access_token = create_access_token(identity=user.id)
-        return jsonify({"message": "Login correcto", "token": access_token}), 200
+        return jsonify({
+            "message": "Login correcto",
+            "token": access_token
+        }), 200
     else:
         return jsonify({"error": "Usuario o contraseña incorrectos"}), 401
 

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Storyfy - Login</title>
+</head>
+<body>
+    <h1>Storyfy</h1>
+    <h2>Login</h2>
+
+    <input type="text" id="username" placeholder="Usuario">
+    <input type="password" id="password" placeholder="Contraseña">
+    <button onclick="login()">Entrar</button>
+
+    <pre id="result"></pre>
+
+    <script>
+        const API_URL = "https://stunning-sniffle-7v4pqr9rxw563rw94-5001.app.github.dev";
+
+        function login() {
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+
+            fetch(`${API_URL}/api/login`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ username, password })
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById("result").textContent = JSON.stringify(data, null, 2);
+
+                if (data.token) {
+                    localStorage.setItem("token", data.token);
+                }
+            })
+            .catch(err => {
+                document.getElementById("result").textContent = "Error al conectar con el backend";
+            });
+        }
+    </script>
+</body>
+</html>
