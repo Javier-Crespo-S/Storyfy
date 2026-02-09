@@ -2,44 +2,302 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Storyfy - Login</title>
+    <title>Storyfy - Demo</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        input, textarea { display: block; margin: 5px 0; width: 300px; }
+        button { margin: 10px 0; }
+        pre { background: #f4f4f4; padding: 10px; max-width: 600px; overflow-x: auto; }
+        .story { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
+    </style>
 </head>
 <body>
-    <h1>Storyfy</h1>
+    <h1>Storyfy APP</h1>
+    
+    <div id="userInfo" style="margin-bottom: 15px; font-weight: bold;"></div>
+
+    <h2>Registro de Usuario</h2>
+    <div id="registerSection">
+        <input type="text" id="regUsername" placeholder="Usuario">
+        <input type="password" id="regPassword" placeholder="Contraseña">
+        <button onclick="register()">Registrar</button>
+        <pre id="registerResult"></pre>
+    </div>
+
+
     <h2>Login</h2>
+    <div id="loginSection">
+        <input type="text" id="username" placeholder="Usuario">
+        <input type="password" id="password" placeholder="Contraseña">
+        <button onclick="login()">Login</button>
+        <pre id="loginResult"></pre>
+    </div>
 
-    <input type="text" id="username" placeholder="Usuario">
-    <input type="password" id="password" placeholder="Contraseña">
-    <button onclick="login()">Entrar</button>
+    <div id="logoutSection" style="display:none;">
+        <button onclick="logout()">Cerrar sesión</button>
+    </div>
+  
+    <h2>Crear Historia</h2>
+    <div id="createStorySection">
+        <input type="text" id="title" placeholder="Título">
+        <textarea id="content" placeholder="Contenido"></textarea>
+        <button onclick="createStory()">Publicar Historia</button>
+        <pre id="storyResult"></pre>
+    </div>
 
-    <pre id="result"></pre>
+    
+    <h2>Historias</h2>
+    <div id="storiesList"></div>
 
-    <script>
-        const API_URL = "https://stunning-sniffle-7v4pqr9rxw563rw94-5001.app.github.dev";
+    <h2>Mis Historias</h2>
+    <div id="myStoriesList"></div>
 
-        function login() {
-            const username = document.getElementById("username").value;
-            const password = document.getElementById("password").value;
+    
+    <button id="logoutBtn" onclick="logout()">Cerrar sesión</button>
 
-            fetch(`${API_URL}/api/login`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ username, password })
-            })
-            .then(res => res.json())
-            .then(data => {
-                document.getElementById("result").textContent = JSON.stringify(data, null, 2);
+<script>
+const API_URL = "http://127.0.0.1:5001";
 
-                if (data.token) {
-                    localStorage.setItem("token", data.token);
-                }
-            })
-            .catch(err => {
-                document.getElementById("result").textContent = "Error al conectar con el backend";
-            });
+function checkAuth() {
+    const token = localStorage.getItem("token");
+    const username = localStorage.getItem("username");
+
+    if (token) {
+        document.getElementById("registerSection").style.display = "none";
+        document.getElementById("loginSection").style.display = "none";
+        document.getElementById("createStorySection").style.display = "block";
+        document.getElementById("logoutBtn").style.display = "block";
+
+        document.getElementById("userInfo").textContent =
+            "Logueado como: " + username;
+    } else {
+        document.getElementById("registerSection").style.display = "block";
+        document.getElementById("loginSection").style.display = "block";
+        document.getElementById("createStorySection").style.display = "none";
+        document.getElementById("logoutBtn").style.display = "none";
+
+        document.getElementById("userInfo").textContent = "";
+    }
+}
+
+function register() {
+    const username = document.getElementById("regUsername").value;
+    const password = document.getElementById("regPassword").value;
+
+    fetch(`${API_URL}/api/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+    })
+    .then(res => res.json())
+    .then(data => {
+        let msg = data.message || data.error || "Respuesta desconocida";
+        document.getElementById("registerResult").textContent = msg;
+        alert(msg);  
+    })
+    .catch(err => {
+        console.error(err);
+        document.getElementById("registerResult").textContent = "Error al conectar con el backend";
+        alert("Error al conectar con el backend");
+    });
+    
+}
+
+
+function login() {
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
+
+    if (!username || !password) {
+        alert("Introduce usuario y contraseña");
+        return;
+    }
+
+    fetch(`${API_URL}/api/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+    })
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById("loginResult").textContent = JSON.stringify(data, null, 2);
+        if (data.token) {
+            localStorage.setItem("token", data.token);
+            localStorage.setItem("username", username);
+            localStorage.setItem("userId", data.user_id);
+            checkAuth();
+            getStories();
+            getMyStories();
+        } else {
+            console.log("Login fallido", data);
         }
-    </script>
+    })
+    .catch(err => {
+        console.error(err);
+        document.getElementById("loginResult").textContent = "Error al conectar con el backend";
+    });
+}
+
+function logout() {
+    localStorage.removeItem("token");
+    localStorage.removeItem("username");
+    checkAuth();
+}
+
+
+function createStory() {
+    const token = localStorage.getItem("token");
+    if (!token) {
+        alert("Primero haz login!");
+        return;
+    }
+
+    const title = document.getElementById("title").value;
+    const content = document.getElementById("content").value;
+
+    fetch(`${API_URL}/api/stories`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + token
+        },
+        body: JSON.stringify({ title, content })
+    })
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById("storyResult").textContent = JSON.stringify(data, null, 2);
+        getStories();
+        getMyStories();
+    })
+    .catch(err => {
+        console.error(err);
+        document.getElementById("storyResult").textContent = "Error al conectar con el backend";
+    });
+}
+
+
+function getStories() {
+    fetch(`${API_URL}/api/stories`)
+    .then(res => res.json())
+    .then(data => {
+        const container = document.getElementById("storiesList");
+        container.innerHTML = "";
+        data.forEach(story => {
+            const div = document.createElement("div");
+            div.className = "story";
+            div.innerHTML = `<strong>${story.title}</strong> por ${story.author}<br>${story.content}`;
+            container.appendChild(div);
+        });
+    })
+    .catch(err => console.error("Error al obtener historias:", err));
+}
+
+function getMyStories() {
+    const token = localStorage.getItem("token");
+    const myId = parseInt(localStorage.getItem("userId"), 10);
+
+    if (!token) return;
+
+    fetch(`${API_URL}/api/stories`, {
+        headers: { "Authorization": "Bearer " + token }
+    })
+    .then(res => res.json())
+    .then(data => {
+        const container = document.getElementById("myStoriesList");
+        container.innerHTML = "";
+
+        data.forEach(story => {
+            if (story.user_id === myId) {
+                const div = document.createElement("div");
+                div.className = "story";
+                div.id = `story-${story.id}`;
+                div.innerHTML = `
+                    <strong id="title-text-${story.id}">${story.title}</strong><br>
+                    <span id="content-text-${story.id}">${story.content}</span><br>
+                    <button onclick="updateStory(${story.id})">Editar</button>
+                    <button onclick="deleteStory(${story.id})">Borrar</button>
+                `;
+                container.appendChild(div);
+            }
+        });
+    })
+    .catch(err => console.error("Error al obtener mis historias:", err));
+}
+
+function updateStory(storyId) {
+    const titleText = document.getElementById(`title-text-${storyId}`);
+    const contentText = document.getElementById(`content-text-${storyId}`);
+
+    const currentTitle = titleText.textContent;
+    const currentContent = contentText.textContent;
+
+    titleText.innerHTML = `<input type="text" id="edit-title-${storyId}" value="${currentTitle}">`;
+    contentText.innerHTML = `<textarea id="edit-content-${storyId}">${currentContent}</textarea>`;
+
+    const div = document.getElementById(`story-${storyId}`);
+    div.querySelector("button[onclick^='updateStory']").textContent = "Guardar";
+    div.querySelector("button[onclick^='updateStory']").onclick = () => saveUpdatedStory(storyId);
+}
+
+function saveUpdatedStory(storyId) {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const newTitle = document.getElementById(`edit-title-${storyId}`).value;
+    const newContent = document.getElementById(`edit-content-${storyId}`).value;
+
+    fetch(`${API_URL}/api/stories/${storyId}`, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + token
+        },
+        body: JSON.stringify({ title: newTitle, content: newContent })
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert(data.message || data.error);
+        getStories();
+        getMyStories();
+    })
+    .catch(err => console.error("Error al actualizar historia:", err));
+}
+
+function deleteStory(storyId) {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    fetch(`${API_URL}/api/stories/${storyId}`, {
+        method: "DELETE",
+        headers: { "Authorization": "Bearer " + token }
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert(data.message || data.error);
+        getStories();
+        getMyStories();
+    })
+    .catch(err => console.error("Error al borrar historia:", err));
+}
+
+document.getElementById("regUsername").addEventListener("keydown", e => { if(e.key === "Enter") register(); });
+document.getElementById("regPassword").addEventListener("keydown", e => { if(e.key === "Enter") register(); });
+
+document.getElementById("username").addEventListener("keydown", e => { if(e.key === "Enter") login(); });
+document.getElementById("password").addEventListener("keydown", e => { if(e.key === "Enter") login(); });
+
+document.getElementById("content").addEventListener("keydown", e => {
+    if(e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        createStory();
+    }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    checkAuth();
+    getStories();
+    getMyStories();
+});
+</script>
 </body>
 </html>

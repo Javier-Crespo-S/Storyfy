@@ -59,10 +59,11 @@ def login():
     user = User.query.filter_by(username=username).first()
 
     if user and check_password_hash(user.password_hash, password):
-        access_token = create_access_token(identity=user.id)
+        access_token = create_access_token(identity=str(user.id))
         return jsonify({
             "message": "Login correcto",
-            "token": access_token
+            "token": access_token,
+            "user_id": user.id
         }), 200
     else:
         return jsonify({"error": "Usuario o contraseña incorrectos"}), 401
@@ -78,12 +79,52 @@ def create_story():
     if not title or not content:
         return jsonify({"error": "Faltan datos"}), 400
 
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     story = Story(title=title, content=content, user_id=user_id)
     db.session.add(story)
     db.session.commit()
 
     return jsonify({"message": "Historia publicada correctamente"}), 201
+
+@app.route("/api/stories/<int:story_id>", methods=["PUT"])
+@jwt_required()
+def update_story(story_id):
+    user_id = int(get_jwt_identity())
+    story = Story.query.get(story_id)
+
+    if not story: 
+        return jsonify({"error": "Historia no encontrada"}), 404
+
+    if story.user_id != user_id:
+        return jsonify({"error": "No tienes permiso para editar esta historia"}), 403
+
+    data = request.get_json()
+    title = data.get("title")
+    content = data.get("content")
+
+    if title:
+        story.title = title
+    if content:
+        story.content = content
+
+    db.session.commit()
+    return jsonify({"message": "Historia actualizada correctamente"}), 200
+
+@app.route("/api/stories/<int:story_id>", methods=["DELETE"])
+@jwt_required()
+def delete_story(story_id):
+    user_id = int(get_jwt_identity())
+    story = Story.query.get(story_id)
+
+    if not story:
+        return jsonify({"error": "Historia no encontrada"}), 404
+
+    if story.user_id != user_id:
+        return jsonify({"error": "No tienes permiso para borrar esta historia"}), 403
+
+    db.session.delete(story)
+    db.session.commit()
+    return jsonify({"message": "Historia borrada correctamente"}), 200
 
 
 @app.route("/api/stories", methods=["GET"])
@@ -95,7 +136,8 @@ def get_stories():
             "id": story.id,
             "title": story.title,
             "content": story.content,
-            "author": story.user.username
+            "author": story.user.username,
+            "user_id": story.user_id
         })
     return jsonify(result), 200
 
